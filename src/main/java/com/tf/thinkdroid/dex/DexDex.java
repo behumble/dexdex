@@ -58,10 +58,13 @@ public class DexDex {
 
     // https://android.googlesource.com/platform/dalvik/+/android-1.6_r1/libcore/dalvik/src/main/java/dalvik/system/PathClassLoader.java
     private static void appendDexListImplUnderICS(String[] jarsOfDex, PathClassLoader pcl, File optDir) throws Exception {
-        String path = DexDex.joinPaths(jarsOfDex);
-        String[] paths = jarsOfDex;
         Class pclClass = pcl.getClass();
         Field fPath = pclClass.getDeclaredField("path");
+        fPath.setAccessible(true);
+        String orgPath = fPath.get(pcl).toString();
+        String pathToAdd = DexDex.joinPaths(jarsOfDex);
+        String path = orgPath+':'+pathToAdd;
+        String[] paths = jarsOfDex;
         DexDex.forceSet(pcl, fPath, path);
         Field fmPaths = pclClass.getDeclaredField("mPaths");
         DexDex.forceSet(pcl, fmPaths, paths);
