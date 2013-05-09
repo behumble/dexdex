@@ -6,8 +6,12 @@ import dalvik.system.DexFile;
 import dalvik.system.PathClassLoader;
 
 import java.io.File;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.zip.ZipFile;
 
 /**
@@ -82,16 +86,42 @@ public class DexDex {
         DexDex.forceSet(pcl, fmDexs, dexs);
     }
 
+    // https://android.googlesource.com/platform/libcore/+/master/dalvik/src/main/java/dalvik/system/BaseDexClassLoader.java
     private static void appendDexListImplICS(String[] jarsOfDex, PathClassLoader pcl, File optDir) throws Exception {
-        Class dplClass = Class.forName("dalvik.system.DexPathList");
-        String dexPathList = DexDex.joinPaths(jarsOfDex);
-        // DexPathList dpl = new DexPathList(dplClass, dexPathList,null,null);
-        Constructor dplConstructor = dplClass.getConstructor(ClassLoader.class, String.class, String.class, File.class);
-        Object dplObj = dplConstructor.newInstance(pcl, dexPathList, null, optDir);
-        // pcl.pathList = dpl;
+        // to save original values
         Class bdclClass = Class.forName("dalvik.system.BaseDexClassLoader");
         // ICS+ - pathList
         Field fPathList = bdclClass.getDeclaredField("pathList");
-        DexDex.forceSet(pcl, fPathList, dplObj);
+        fPathList.setAccessible(true);
+        Object dplObj = fPathList.get(pcl);
+        // to call DexPathList.makeDexElements() for additional jar(apk)s
+        ArrayList<File> jarFiles = DexDex.strings2Files(jarsOfDex);
+        Class dplClass = dplObj.getClass();
+        Field fDexElements = dplClass.getDeclaredField("dexElements");
+        fDexElements.setAccessible(true);
+        Object objOrgDexElements = fDexElements.get(dplObj);
+        int orgDexCount = Array.getLength(objOrgDexElements);
+        Class clazzElement = Class.forName("dalvik.system.DexPathList$Element");
+        // create new merged array
+        Object newDexElemArray = Array.newInstance(clazzElement, orgDexCount + jarsOfDex.length);
+        System.arraycopy(objOrgDexElements,0, newDexElemArray, 0, orgDexCount);
+        Method mMakeDexElements = dplClass.getDeclaredMethod("makeDexElements", ArrayList.class, File.class);
+        mMakeDexElements.setAccessible(true);
+        Object elemsToAdd = mMakeDexElements.invoke(null, jarFiles, optDir);
+        for(int i=0;i<jarsOfDex.length;i++) {
+            int pos = orgDexCount+i;
+            Object elemToAdd = Array.get(elemsToAdd, i);
+            Array.set(newDexElemArray, pos, elemToAdd);
+        }
+        DexDex.forceSet(dplObj, fDexElements, newDexElemArray);
+    }
+
+    private static ArrayList<File> strings2Files(String[] paths) {
+        ArrayList<File> result = new ArrayList<File>(paths.length);
+        int size = paths.length;
+        for(int i=0;i<size;i++) {
+            result.add(new File(paths[i]));
+        }
+        return result;
     }
 }
