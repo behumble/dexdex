@@ -1,13 +1,13 @@
 package com.tf.thinkdroid.dex;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.os.Build;
 import dalvik.system.DexFile;
 import dalvik.system.PathClassLoader;
 
-import java.io.File;
+import java.io.*;
 import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -20,6 +20,8 @@ import java.util.zip.ZipFile;
  */
 public class DexDex {
     private static final int SDK_INT_ICS = 14;
+    public static final String DIR_DUBDEX = "subdex";
+    private static final int BUF_SIZE = 8 * 1024;
 
     private DexDex() {
         // do not create an instance
@@ -35,18 +37,75 @@ public class DexDex {
         return buf.toString();
     }
 
-    public static void appendDexList(Context cxt, String[] jarsOfDex) {
-        File optDir = cxt.getDir("dex", Context.MODE_PRIVATE);
+    private static boolean shouldInit(File apkFile, File dexDir, String[] names) {
+        long apkDate = apkFile.lastModified();
+        // APK upgrade case
+        if(apkDate>dexDir.lastModified()) return true;
+        // clean install (or crash during install) case
+        for(int i=0;i<names.length;i++) {
+            String name = names[i];
+            File dexJar = new File(dexDir, name);
+            if(dexJar.exists()) {
+                if(dexJar.lastModified()<apkDate) return true;
+            } else {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param names array of file names in 'assets' directory
+     */
+    public static void validateSubDexList(Context cxt, String[] names) {
+        File dexDir = cxt.getDir(DIR_DUBDEX, Context.MODE_PRIVATE); // this API creates the directory if not exist
+        File apkFile = new File(cxt.getApplicationInfo().sourceDir);
+        // should copy subdex JARs to dexDir?
+        boolean shouldInit = shouldInit(apkFile, dexDir, names);
+        System.out.println("[DexDex.validateSubDexList] shouldInit : "+shouldInit);
+
+        String strDexDir = dexDir.getAbsolutePath();
+        String[] jarsOfDex = new String[names.length];
+        for(int i=0;i<jarsOfDex.length;i++) {
+            jarsOfDex[i] = strDexDir+'/'+names[i];
+        }
+
+        if(shouldInit) {
+            copyToInternal(cxt, dexDir, names);
+        }
+
         PathClassLoader pcl = (PathClassLoader) cxt.getClassLoader();
         // do something dangerous
         try {
             if(Build.VERSION.SDK_INT<SDK_INT_ICS) {
-                appendDexListImplUnderICS(jarsOfDex, pcl, optDir);
+                appendDexListImplUnderICS(jarsOfDex, pcl, dexDir);
             } else {    // ICS+
-                appendDexListImplICS(jarsOfDex, pcl, optDir);
+                appendDexListImplICS(jarsOfDex, pcl, dexDir);
             }
         } catch (Exception ex) {
             throw new RuntimeException(ex);
+        }
+    }
+
+    private static void copyToInternal(Context cxt, File destDir, String[] names) {
+        String strDestDir = destDir.getAbsolutePath();
+        AssetManager assets = cxt.getAssets();
+        byte[] buf = new byte[BUF_SIZE];
+        for(int i=0;i<names.length;i++) {
+            String name = names[i];
+            String destPath = strDestDir+'/'+name;
+            try {
+                BufferedInputStream bis = new BufferedInputStream(assets.open(name));
+                BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(destPath));
+                int len;
+                while((len=bis.read(buf, 0, BUF_SIZE))>0) {
+                    bos.write(buf, 0, len);
+                }
+                bis.close();
+                bos.close();
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
         }
     }
 
@@ -117,6 +176,7 @@ public class DexDex {
             Array.set(newDexElemArray, pos, elemToAdd);
         }
         DexDex.forceSet(dplObj, fDexElements, newDexElemArray);
+        System.out.println("DexDex.appendDexListImplICS : "+ Arrays.deepToString((Object[]) newDexElemArray));
     }
 
     private static ArrayList<File> strings2Files(String[] paths) {
