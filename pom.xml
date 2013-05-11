@@ -40,13 +40,6 @@
         </dependency>
     </dependencies>
 
-    <scm>
-        <connection>scm:git:git@github.com:behumble/excanvas.git</connection>
-        <url>scm:git:git@github.com:behumble/excanvas.git</url>
-        <developerConnection>scm:git:git@github.com:behumble/excanvas.git</developerConnection>
-      <tag>excanvas-0.1</tag>
-  </scm>
-
     <build>
         <plugins>
             <plugin>
