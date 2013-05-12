@@ -6,7 +6,11 @@ import android.os.Build;
 import dalvik.system.DexFile;
 import dalvik.system.PathClassLoader;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,11 +20,12 @@ import java.util.zip.ZipFile;
 
 /**
  * Easy class loading for multi-dex Android application
+ *
  * @author Alan Goo
  */
 public class DexDex {
-    private static final int SDK_INT_ICS = 14;
     public static final String DIR_DUBDEX = "subdex";
+    private static final int SDK_INT_ICS = 14;
     private static final int BUF_SIZE = 8 * 1024;
 
     private DexDex() {
@@ -28,9 +33,9 @@ public class DexDex {
     }
 
     private static String joinPaths(String[] paths) {
-        if(paths==null) return "";
+        if (paths == null) return "";
         StringBuilder buf = new StringBuilder();
-        for(int i=0;i<paths.length;i++) {
+        for (int i = 0; i < paths.length; i++) {
             buf.append(paths[i]);
             buf.append(':');
         }
@@ -40,13 +45,13 @@ public class DexDex {
     private static boolean shouldInit(File apkFile, File dexDir, String[] names) {
         long apkDate = apkFile.lastModified();
         // APK upgrade case
-        if(apkDate>dexDir.lastModified()) return true;
+        if (apkDate > dexDir.lastModified()) return true;
         // clean install (or crash during install) case
-        for(int i=0;i<names.length;i++) {
+        for (int i = 0; i < names.length; i++) {
             String name = names[i];
             File dexJar = new File(dexDir, name);
-            if(dexJar.exists()) {
-                if(dexJar.lastModified()<apkDate) return true;
+            if (dexJar.exists()) {
+                if (dexJar.lastModified() < apkDate) return true;
             } else {
                 return true;
             }
@@ -57,27 +62,38 @@ public class DexDex {
     /**
      * @param names array of file names in 'assets' directory
      */
-    public static void validateSubDexList(Context cxt, String[] names) {
-        File dexDir = cxt.getDir(DIR_DUBDEX, Context.MODE_PRIVATE); // this API creates the directory if not exist
+    public static Runnable validateSubDexInAssets(final Context cxt, final String[] names) {
+        final File dexDir = cxt.getDir(DIR_DUBDEX, Context.MODE_PRIVATE); // this API creates the directory if not exist
         File apkFile = new File(cxt.getApplicationInfo().sourceDir);
         // should copy subdex JARs to dexDir?
-        boolean shouldInit = shouldInit(apkFile, dexDir, names);
-        System.out.println("[DexDex.validateSubDexList] shouldInit : "+shouldInit);
+        final boolean shouldInit = shouldInit(apkFile, dexDir, names);
+        if(shouldInit) {
+            return new Runnable() {
+                @Override
+                public void run() {
+                    forceInit(cxt, names, dexDir, shouldInit);
+                }
+            };
+        } else {
+            return null;
+        }
+    }
 
+    private static void forceInit(Context cxt, String[] names, File dexDir, boolean shouldInit) {
         String strDexDir = dexDir.getAbsolutePath();
         String[] jarsOfDex = new String[names.length];
-        for(int i=0;i<jarsOfDex.length;i++) {
-            jarsOfDex[i] = strDexDir+'/'+names[i];
+        for (int i = 0; i < jarsOfDex.length; i++) {
+            jarsOfDex[i] = strDexDir + '/' + names[i];
         }
 
-        if(shouldInit) {
+        if (shouldInit) {
             copyToInternal(cxt, dexDir, names);
         }
 
         PathClassLoader pcl = (PathClassLoader) cxt.getClassLoader();
         // do something dangerous
         try {
-            if(Build.VERSION.SDK_INT<SDK_INT_ICS) {
+            if (Build.VERSION.SDK_INT < SDK_INT_ICS) {
                 appendDexListImplUnderICS(jarsOfDex, pcl, dexDir);
             } else {    // ICS+
                 appendDexListImplICS(jarsOfDex, pcl, dexDir);
@@ -91,14 +107,14 @@ public class DexDex {
         String strDestDir = destDir.getAbsolutePath();
         AssetManager assets = cxt.getAssets();
         byte[] buf = new byte[BUF_SIZE];
-        for(int i=0;i<names.length;i++) {
+        for (int i = 0; i < names.length; i++) {
             String name = names[i];
-            String destPath = strDestDir+'/'+name;
+            String destPath = strDestDir + '/' + name;
             try {
                 BufferedInputStream bis = new BufferedInputStream(assets.open(name));
                 BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(destPath));
                 int len;
-                while((len=bis.read(buf, 0, BUF_SIZE))>0) {
+                while ((len = bis.read(buf, 0, BUF_SIZE)) > 0) {
                     bos.write(buf, 0, len);
                 }
                 bis.close();
@@ -109,7 +125,9 @@ public class DexDex {
         }
     }
 
-    /** dalvik do not have security manager */
+    /**
+     * dalvik do not have security manager
+     */
     private static void forceSet(Object obj, Field f, Object val) throws IllegalAccessException {
         f.setAccessible(true);
         f.set(obj, val);
@@ -122,7 +140,7 @@ public class DexDex {
         fPath.setAccessible(true);
         String orgPath = fPath.get(pcl).toString();
         String pathToAdd = DexDex.joinPaths(jarsOfDex);
-        String path = orgPath+':'+pathToAdd;
+        String path = orgPath + ':' + pathToAdd;
         String[] paths = jarsOfDex;
         DexDex.forceSet(pcl, fPath, path);
         Field fmPaths = pclClass.getDeclaredField("mPaths");
@@ -131,11 +149,11 @@ public class DexDex {
         File[] files = new File[paths.length];
         ZipFile[] zips = new ZipFile[paths.length];
         DexFile[] dexs = new DexFile[paths.length];
-        for(int i=0;i<paths.length;i++) {
+        for (int i = 0; i < paths.length; i++) {
             File pathFile = new File(paths[i]);
             files[i] = pathFile;
             zips[i] = new ZipFile(pathFile);
-            if(wantDex) {
+            if (wantDex) {
                 File outFile = new File(optDir, pathFile.getName());
                 dexs[i] = DexFile.loadDex(pathFile.getAbsolutePath(), outFile.getAbsolutePath(), 0);
             }
@@ -166,23 +184,23 @@ public class DexDex {
         Class clazzElement = Class.forName("dalvik.system.DexPathList$Element");
         // create new merged array
         Object newDexElemArray = Array.newInstance(clazzElement, orgDexCount + jarsOfDex.length);
-        System.arraycopy(objOrgDexElements,0, newDexElemArray, 0, orgDexCount);
+        System.arraycopy(objOrgDexElements, 0, newDexElemArray, 0, orgDexCount);
         Method mMakeDexElements = dplClass.getDeclaredMethod("makeDexElements", ArrayList.class, File.class);
         mMakeDexElements.setAccessible(true);
         Object elemsToAdd = mMakeDexElements.invoke(null, jarFiles, optDir);
-        for(int i=0;i<jarsOfDex.length;i++) {
-            int pos = orgDexCount+i;
+        for (int i = 0; i < jarsOfDex.length; i++) {
+            int pos = orgDexCount + i;
             Object elemToAdd = Array.get(elemsToAdd, i);
             Array.set(newDexElemArray, pos, elemToAdd);
         }
         DexDex.forceSet(dplObj, fDexElements, newDexElemArray);
-        System.out.println("DexDex.appendDexListImplICS : "+ Arrays.deepToString((Object[]) newDexElemArray));
+        System.out.println("DexDex.appendDexListImplICS : " + Arrays.deepToString((Object[]) newDexElemArray));
     }
 
     private static ArrayList<File> strings2Files(String[] paths) {
         ArrayList<File> result = new ArrayList<File>(paths.length);
         int size = paths.length;
-        for(int i=0;i<size;i++) {
+        for (int i = 0; i < size; i++) {
             result.add(new File(paths[i]));
         }
         return result;
