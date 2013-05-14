@@ -2,15 +2,12 @@ package com.tf.thinkdroid.dex;
 
 import android.content.Context;
 import android.content.res.AssetManager;
-import android.os.Build;
+import android.os.*;
+import android.widget.Toast;
 import dalvik.system.DexFile;
 import dalvik.system.PathClassLoader;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -27,6 +24,7 @@ public class DexDex {
     public static final String DIR_DUBDEX = "subdex";
     private static final int SDK_INT_ICS = 14;
     private static final int BUF_SIZE = 8 * 1024;
+    private static final int WHAT_FINISH = 9900;
 
     private DexDex() {
         // do not create an instance
@@ -60,34 +58,68 @@ public class DexDex {
     }
 
     /**
+     * MUST be called on Main Thread
      * @param names array of file names in 'assets' directory
      */
-    public static Runnable validateSubDexInAssets(final Context cxt, final String[] names) {
+    public static void validateSubDexInAssets(final Context cxt, final String[] names) {
         final File dexDir = cxt.getDir(DIR_DUBDEX, Context.MODE_PRIVATE); // this API creates the directory if not exist
         File apkFile = new File(cxt.getApplicationInfo().sourceDir);
         // should copy subdex JARs to dexDir?
         final boolean shouldInit = shouldInit(apkFile, dexDir, names);
         if(shouldInit) {
-            return new Runnable() {
-                @Override
-                public void run() {
-                    forceInit(cxt, names, dexDir, shouldInit);
-                }
-            };
+            try {
+                // swap MessageQueue (dirty code collection)
+                final Looper mainLooper = Looper.getMainLooper();
+                final MessageQueue mq = Looper.myQueue();
+                final Handler dummyHandler = new Handler();
+
+                Runnable longLoadRunnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        copyToInternal(cxt, dexDir, names);
+                        loadSubDexes(cxt, dexDir, names);
+                        Message msgFinish = Message.obtain(dummyHandler, WHAT_FINISH);
+                        FrameworkHack.enqeue(mq, msgFinish);
+                    }
+                };
+                Thread t = new Thread(longLoadRunnable, "DexDex Thread");
+                t.start();
+
+                // keep old messages and postpone until all classes are loaded
+                Message orgMessages = FrameworkHack.getMessages(mq);
+
+                FrameworkHack.setMessages(mq, null);
+                // something ing...
+                Toast.makeText(cxt, "DexOpting...", Toast.LENGTH_LONG).show();
+                DexDex.loopByHand(mq);
+
+                FrameworkHack.setMessages(mq, orgMessages);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         } else {
-            return null;
+            loadSubDexes(cxt, dexDir, names);
         }
     }
 
-    private static void forceInit(Context cxt, String[] names, File dexDir, boolean shouldInit) {
+    /** like Looper.loop() */
+    private static void loopByHand(MessageQueue q) {
+        while(true) {
+            Message msg = FrameworkHack.messageQueueNext(q);
+            if(msg.what==WHAT_FINISH) {
+                return;
+            }
+            if(msg==null) return;   // quit() called
+            msg.getTarget().dispatchMessage(msg);
+            msg.recycle();
+        }
+    }
+
+    private static void loadSubDexes(Context cxt, File dexDir, String[] names) {
         String strDexDir = dexDir.getAbsolutePath();
         String[] jarsOfDex = new String[names.length];
         for (int i = 0; i < jarsOfDex.length; i++) {
             jarsOfDex[i] = strDexDir + '/' + names[i];
-        }
-
-        if (shouldInit) {
-            copyToInternal(cxt, dexDir, names);
         }
 
         PathClassLoader pcl = (PathClassLoader) cxt.getClassLoader();
