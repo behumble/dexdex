@@ -42,6 +42,25 @@ public class DexDex {
         return false;
     }
 
+    /** find and append all JARs */
+    public static void addAllJARsInAssets(final Context cxt, final Listener listener) {
+        try {
+            String[] files = cxt.getAssets().list("");
+            ArrayList<String> jarList = new ArrayList<String>();
+            for(int i=0;i<files.length;i++) {
+                String jar = files[i];
+                if(jar.endsWith(".jar")) {
+                    jarList.add(jar);
+                }
+            }
+            String[] arrJars = new String[jarList.size()];
+            jarList.toArray(arrJars);
+            addDexesInAssets(cxt, arrJars, listener);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     /**
      * MUST be called on Main Thread
      * @param names array of file names in 'assets' directory
