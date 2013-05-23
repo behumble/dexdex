@@ -14,7 +14,7 @@ import java.util.Arrays;
 import java.util.zip.ZipFile;
 
 /**
- * Collection of dirty codes
+ * Collection of dirty codes. don't tell android team this mess.
  * @author Alan Goo
  */
 public class FrameworkHack {
@@ -80,6 +80,12 @@ public class FrameworkHack {
         f.set(obj, val);
     }
 
+    private static Object forceGetFirst(Object obj, Field fArray) throws IllegalAccessException {
+        fArray.setAccessible(true);
+        Object[] vArray = (Object[]) fArray.get(obj);
+        return vArray[0];
+    }
+
     private static String joinPaths(String[] paths) {
         if (paths == null) return "";
         StringBuilder buf = new StringBuilder();
@@ -91,35 +97,46 @@ public class FrameworkHack {
     }
 
     // https://android.googlesource.com/platform/dalvik/+/android-1.6_r1/libcore/dalvik/src/main/java/dalvik/system/PathClassLoader.java
-    public static void appendDexListImplUnderICS(String[] jarsOfDex, PathClassLoader pcl, File optDir) throws Exception {
+    public static void appendDexListImplUnderICS(String[] jarPathsToAppend, PathClassLoader pcl, File optDir) throws Exception {
+        int oldSize = 1;    // gonna assume the original path had single entry for simplicity
         Class pclClass = pcl.getClass();
         Field fPath = pclClass.getDeclaredField("path");
         fPath.setAccessible(true);
         String orgPath = fPath.get(pcl).toString();
-        String pathToAdd = joinPaths(jarsOfDex);
+        String pathToAdd = joinPaths(jarPathsToAppend);
         String path = orgPath + ':' + pathToAdd;
-        String[] paths = jarsOfDex;
         forceSet(pcl, fPath, path);
-        Field fmPaths = pclClass.getDeclaredField("mPaths");
-        forceSet(pcl, fmPaths, paths);
+
         boolean wantDex = System.getProperty("android.vm.dexfile", "").equals("true");
-        File[] files = new File[paths.length];
-        ZipFile[] zips = new ZipFile[paths.length];
-        DexFile[] dexs = new DexFile[paths.length];
-        for (int i = 0; i < paths.length; i++) {
-            File pathFile = new File(paths[i]);
-            files[i] = pathFile;
-            zips[i] = new ZipFile(pathFile);
+        File[] files = new File[oldSize + jarPathsToAppend.length];
+        ZipFile[] zips = new ZipFile[oldSize + jarPathsToAppend.length];
+        DexFile[] dexs = new DexFile[oldSize + jarPathsToAppend.length];
+
+        Field fmPaths = pclClass.getDeclaredField("mPaths");
+        String[] newMPaths = new String[oldSize+jarPathsToAppend.length];
+        // set originals
+        newMPaths[0] = (String) forceGetFirst(pcl, fmPaths);
+        forceSet(pcl, fmPaths, newMPaths);
+        Field fmFiles = pclClass.getDeclaredField("mFiles");
+        files[0] = (File) forceGetFirst(pcl, fmFiles);
+        Field fmZips = pclClass.getDeclaredField("mZips");
+        zips[0] = (ZipFile) forceGetFirst(pcl, fmZips);
+        Field fmDexs = pclClass.getDeclaredField("mDexs");
+        dexs[0] = (DexFile) forceGetFirst(pcl, fmDexs);
+
+        for (int i = 0; i < jarPathsToAppend.length; i++) {
+            newMPaths[oldSize+i] = jarPathsToAppend[i];
+            File pathFile = new File(jarPathsToAppend[i]);
+            files[oldSize+i] = pathFile;
+            zips[oldSize+i] = new ZipFile(pathFile);
             if (wantDex) {
-                File outFile = new File(optDir, pathFile.getName());
-                dexs[i] = DexFile.loadDex(pathFile.getAbsolutePath(), outFile.getAbsolutePath(), 0);
+                String outDexName = pathFile.getName()+".dex";
+                File outFile = new File(optDir, outDexName);
+                dexs[oldSize+i] = DexFile.loadDex(pathFile.getAbsolutePath(), outFile.getAbsolutePath(), 0);
             }
         }
-        Field fmFiles = pclClass.getDeclaredField("mFiles");
         forceSet(pcl, fmFiles, files);
-        Field fmZips = pclClass.getDeclaredField("mZips");
         forceSet(pcl, fmZips, zips);
-        Field fmDexs = pclClass.getDeclaredField("mDexs");
         forceSet(pcl, fmDexs, dexs);
     }
 
@@ -152,6 +169,5 @@ public class FrameworkHack {
             Array.set(newDexElemArray, pos, elemToAdd);
         }
         forceSet(dplObj, fDexElements, newDexElemArray);
-        System.out.println("DexDex.appendDexListImplICS : " + Arrays.deepToString((Object[]) newDexElemArray));
     }
 }
