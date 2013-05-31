@@ -1,27 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.sonatype.oss</groupId>
+        <artifactId>oss-parent</artifactId>
+        <version>7</version>
+    </parent>
+
     <groupId>com.thinkfree.android</groupId>
     <artifactId>dexdex</artifactId>
-    <version>0.1</version>
-    <description>Utility to use multiple classes.dex files</description>
+    <packaging>jar</packaging>
+    <version>0.1-SNAPSHOT</version>
+    <description>Classpath appender for android</description>
+    <url>http://github.com/behumble/dexdex</url>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <url>http://github.com/behumble/dexdex</url>
+        <connection>scm:git:git://github.com/behumble/dexdex.git</connection>
+        <developerConnection>scm:git:git@github.com:behumble/dexdex.git</developerConnection>
+    </scm>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <licenses>
-        <license>
-            <name>The Apache Software License, Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-        </license>
-    </licenses>
-
     <developers>
         <developer>
-            <id>accent</id>
+            <id>behumble</id>
             <name>Alan Goo</name>
-            <email>accent@thinkfree.com</email>
+            <organization>ThinkFree</organization>
+            <timezone>Asia/Seoul</timezone>
+            <url>http://log.hanjava.net</url>
+            <email>behumble@hanjava.net</email>
         </developer>
     </developers>
 
@@ -44,28 +62,26 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>1.4</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.0</version>
                 <configuration>
                     <source>1.6</source>
                     <target>1.6</target>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-release-plugin</artifactId>
-                <version>2.4</version>
-            </plugin>
         </plugins>
     </build>
-    <distributionManagement>
-        <repository>
-            <id>local-releases</id>
-            <url>file:${project.basedir}/repo/releases</url>
-        </repository>
-	<snapshotRepository>
-		<id>local-snapshots</id>
-		<url>file:${project.basedir}/repo/snapshots</url>
-	</snapshotRepository>
-    </distributionManagement>
 </project>
