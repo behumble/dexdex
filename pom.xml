@@ -11,7 +11,7 @@
     <groupId>com.thinkfree.android</groupId>
     <artifactId>dexdex</artifactId>
     <packaging>jar</packaging>
-    <version>0.1</version>
+    <version>0.2-SNAPSHOT</version>
     <description>Classpath appender for android</description>
     <url>http://github.com/behumble/dexdex</url>
     <licenses>
