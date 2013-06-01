@@ -75,14 +75,14 @@ public class DexDex {
                 // swap MessageQueue (dirty code collection)
                 final Looper mainLooper = Looper.getMainLooper();
                 final MessageQueue mq = Looper.myQueue();
-                final Handler dummyHandler = new Handler();
+                final Handler handler = new Handler();
 
                 Runnable longLoadRunnable = new Runnable() {
                     @Override
                     public void run() {
-                        copyToInternal(cxt, dexDir, names, listener);
+                        copyToInternal(cxt, dexDir, names, listener, handler);
                         appendToClassPath(cxt, dexDir, names);
-                        Message msgFinish = Message.obtain(dummyHandler, WHAT_FINISH);
+                        Message msgFinish = Message.obtain(handler, WHAT_FINISH);
                         FrameworkHack.enqeue(mq, msgFinish);
                     }
                 };
@@ -98,19 +98,19 @@ public class DexDex {
                 if(listener==null) {
                     Toast.makeText(cxt, "DexOpting...", Toast.LENGTH_LONG).show();
                 } else {
-                    listener.prepareStarted();
+                    listener.prepareStarted(handler);
                 }
 
                 DexDex.loopByHand(mq);  // right here waiting...
 
                 // restore original events to be dispatched
                 FrameworkHack.setMessages(mq, orgMessages);
+
+                if(listener!=null) {
+                    listener.prepareEnded(handler);
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
-            }
-
-            if(listener!=null) {
-                listener.prepareEnded();
             }
         } else {
             appendToClassPath(cxt, dexDir, names);
@@ -151,7 +151,7 @@ public class DexDex {
         }
     }
 
-    private static void copyToInternal(Context cxt, File destDir, String[] names, Listener listener) {
+    private static void copyToInternal(Context cxt, File destDir, String[] names, Listener listener, Handler handler) {
         String strDestDir = destDir.getAbsolutePath();
         AssetManager assets = cxt.getAssets();
         byte[] buf = new byte[BUF_SIZE];
@@ -159,7 +159,7 @@ public class DexDex {
             String name = names[i];
             String destPath = strDestDir + '/' + name;
             if(listener!=null) {
-                listener.prepareItemStarted(name);
+                listener.prepareItemStarted(name, handler);
             }
 
             try {
@@ -176,7 +176,7 @@ public class DexDex {
             }
 
             if(listener!=null) {
-                listener.prepareItemEnded(name);
+                listener.prepareItemEnded(name, handler);
             }
         }
     }
