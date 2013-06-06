@@ -11,7 +11,7 @@ with dexdex you don't need
 
 ANR proof
 ---------
-with (dirty) event pumping, long running tasks(copying JARs to internals and dexopting) can be done in main thread.
+with (dirty) event pumping, long running tasks(copying JARs to internals and dexopting) are be done in thread while UI events are not blocked.
 
 How to use
 ----------
