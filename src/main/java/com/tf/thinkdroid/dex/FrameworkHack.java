@@ -1,3 +1,19 @@
+/*
+ * Copyright 2013 ThinkFree
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.tf.thinkdroid.dex;
 
 import android.os.Message;
@@ -10,7 +26,6 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.zip.ZipFile;
 
 /**
@@ -19,15 +34,12 @@ import java.util.zip.ZipFile;
  */
 public class FrameworkHack {
     private static Method METHOD_MESSAGE_QUEUE_NEXT;
-    private static Method METHOD_MESSAGE_QUEUE_ENQUEUE;
     private static Field FIELD_MESSAGE_QUEUE_MESSAGES;
 
     static {
         try {
             METHOD_MESSAGE_QUEUE_NEXT = MessageQueue.class.getDeclaredMethod("next");
             METHOD_MESSAGE_QUEUE_NEXT.setAccessible(true);
-            METHOD_MESSAGE_QUEUE_ENQUEUE = MessageQueue.class.getDeclaredMethod("enqueueMessage", Message.class, long.class);
-            METHOD_MESSAGE_QUEUE_ENQUEUE.setAccessible(true);
             FIELD_MESSAGE_QUEUE_MESSAGES = MessageQueue.class.getDeclaredField("mMessages");
             FIELD_MESSAGE_QUEUE_MESSAGES.setAccessible(true);
         } catch (Exception ex) {
@@ -60,14 +72,6 @@ public class FrameworkHack {
         try {
             FIELD_MESSAGE_QUEUE_MESSAGES.set(q, messages);
         } catch (IllegalAccessException ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public static void enqeue(MessageQueue q, Message msg) {
-        try {
-            METHOD_MESSAGE_QUEUE_ENQUEUE.invoke(q, msg, 0);
-        } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
     }

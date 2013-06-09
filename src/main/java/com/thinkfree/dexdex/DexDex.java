@@ -1,8 +1,25 @@
+/*
+ * Copyright 2013 ThinkFree
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.thinkfree.dexdex;
 
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.os.*;
+import android.util.Log;
 import android.widget.Toast;
 import com.tf.thinkdroid.dex.FrameworkHack;
 import dalvik.system.PathClassLoader;
@@ -75,7 +92,7 @@ public class DexDex {
                 // swap MessageQueue (dirty code collection)
                 final Looper mainLooper = Looper.getMainLooper();
                 final MessageQueue mq = Looper.myQueue();
-                final Handler handler = new Handler();
+                final Handler handler = new Handler(mainLooper);
 
                 Runnable longLoadRunnable = new Runnable() {
                     @Override
@@ -83,7 +100,7 @@ public class DexDex {
                         copyToInternal(cxt, dexDir, names, listener, handler);
                         appendToClassPath(cxt, dexDir, names);
                         Message msgFinish = Message.obtain(handler, WHAT_FINISH);
-                        FrameworkHack.enqeue(mq, msgFinish);
+                        handler.sendMessage(msgFinish);
                     }
                 };
                 Thread t = new Thread(longLoadRunnable, "DexDex Thread");
@@ -121,6 +138,7 @@ public class DexDex {
     private static void loopByHand(MessageQueue q) {
         while(true) {
             Message msg = FrameworkHack.messageQueueNext(q);
+            Log.d("DexDex", "loopByHand "+msg);
             if(msg.what==WHAT_FINISH) {
                 return;
             }
