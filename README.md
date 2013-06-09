@@ -43,7 +43,7 @@ Maven
 <dependency>
     <groupId>com.thinkfree.android</groupId>
     <artifactId>dexdex</artifactId>
-    <version>0.1.2</version>
+    <version>0.1.3</version>
 </dependency>
 ```
  
