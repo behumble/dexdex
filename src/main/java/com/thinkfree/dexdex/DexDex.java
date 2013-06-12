@@ -94,22 +94,8 @@ public class DexDex {
             try {
                 // swap MessageQueue (dirty code collection)
                 final Looper mainLooper = Looper.getMainLooper();
-                Log.d(TAG, "-==--=-=-=-=--=-= mainlooper -=-=--=-=-=-= : "+mainLooper);
                 final MessageQueue mq = Looper.myQueue();
-                mq.addIdleHandler(new MessageQueue.IdleHandler() {
-                    @Override
-                    public boolean queueIdle() {
-                        Log.d(TAG, "-==--=-=-=-=--=-= queueIdle -=-=--=-=-=-= : ");
-                        return true;
-                    }
-                });
-                final Handler handler = new Handler(mainLooper) {
-                    @Override
-                    public void handleMessage(Message msg) {
-                        Log.d(TAG, "DexDex/Handler.handleMessage("+msg+") callback ? "+msg.getCallback());
-                        super.handleMessage(msg);
-                    }
-                };
+                final Handler handler = new Handler(mainLooper);
 
                 Runnable longLoadRunnable = new Runnable() {
                     @Override
@@ -139,9 +125,8 @@ public class DexDex {
                 DexDex.loopByHand(mq);  // right here waiting...
 
                 // restore original events to be dispatched
-                FrameworkHack.setMessages(mq, orgMessages);
-                Log.d(TAG, "messages restored");
-                dumpMessages(orgMessages);
+                FrameworkHack.appendMessages(mq, orgMessages);
+                Log.d(TAG, "original messages appended");
 
                 if(listener!=null) {
                     listener.prepareEnded(handler);
@@ -157,13 +142,9 @@ public class DexDex {
 
     /** like Looper.loop() */
     private static void loopByHand(MessageQueue q) {
-        Log.d(TAG, "loopByHand : "+q);
         while(true) {
             Message msg = FrameworkHack.messageQueueNext(q);
-            dumpMessage(msg);
             if(msg.what==WHAT_FINISH) {
-                Log.d(TAG, "!!!!!!!!!!!!!!!!!!!!!!!! After finish !!!!!!!!!!!!!!!!!!!!!!!!!!");
-                dumpMessages(msg);
                 return;
             }
             if(msg==null) return;   // quit() called

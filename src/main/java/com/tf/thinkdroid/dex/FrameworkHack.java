@@ -69,6 +69,28 @@ public class FrameworkHack {
         }
     }
 
+    public static void appendMessages(MessageQueue q, Message msgsToAdd) {
+        Field fieldNext = null;
+        try {
+            fieldNext = Message.class.getDeclaredField("next");
+            fieldNext.setAccessible(true);
+            Message head = getMessages(q);
+            if(head==null) {
+                setMessages(q, msgsToAdd);
+            } else {
+                Message msg = head;
+                Message tail = msg;
+                while(msg!=null) {
+                    tail = msg;
+                    msg = (Message) fieldNext.get(msg);
+                }
+                fieldNext.set(tail, msgsToAdd);
+            }
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
     public static void setMessages(MessageQueue q, Message messages) {
         try {
             FIELD_MESSAGE_QUEUE_MESSAGES.set(q, messages);
