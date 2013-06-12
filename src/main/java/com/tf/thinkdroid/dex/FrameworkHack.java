@@ -33,6 +33,7 @@ import java.util.zip.ZipFile;
  * @author Alan Goo
  */
 public class FrameworkHack {
+    private static final String TAG = "FrameworkHack";
     private static Method METHOD_MESSAGE_QUEUE_NEXT;
     private static Field FIELD_MESSAGE_QUEUE_MESSAGES;
 

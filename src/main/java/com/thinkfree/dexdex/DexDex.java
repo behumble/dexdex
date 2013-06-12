@@ -25,7 +25,9 @@ import com.tf.thinkdroid.dex.FrameworkHack;
 import dalvik.system.PathClassLoader;
 
 import java.io.*;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Date;
 
 /**
  * Easy class loading for multi-dex Android application
@@ -34,6 +36,7 @@ import java.util.ArrayList;
  */
 public class DexDex {
     public static final String DIR_DUBDEX = "dexdex";
+    private static final String TAG = "DexDex";
     private static final int SDK_INT_ICS = 14;
     private static final int BUF_SIZE = 8 * 1024;
     private static final int WHAT_FINISH = 9900;
@@ -91,8 +94,22 @@ public class DexDex {
             try {
                 // swap MessageQueue (dirty code collection)
                 final Looper mainLooper = Looper.getMainLooper();
+                Log.d(TAG, "-==--=-=-=-=--=-= mainlooper -=-=--=-=-=-= : "+mainLooper);
                 final MessageQueue mq = Looper.myQueue();
-                final Handler handler = new Handler(mainLooper);
+                mq.addIdleHandler(new MessageQueue.IdleHandler() {
+                    @Override
+                    public boolean queueIdle() {
+                        Log.d(TAG, "-==--=-=-=-=--=-= queueIdle -=-=--=-=-=-= : ");
+                        return true;
+                    }
+                });
+                final Handler handler = new Handler(mainLooper) {
+                    @Override
+                    public void handleMessage(Message msg) {
+                        Log.d(TAG, "DexDex/Handler.handleMessage("+msg+") callback ? "+msg.getCallback());
+                        super.handleMessage(msg);
+                    }
+                };
 
                 Runnable longLoadRunnable = new Runnable() {
                     @Override
@@ -113,6 +130,7 @@ public class DexDex {
 
                 // something ing...
                 if(listener==null) {
+                    Log.d(TAG, "listener null");
                     Toast.makeText(cxt, "DexOpting...", Toast.LENGTH_LONG).show();
                 } else {
                     listener.prepareStarted(handler);
@@ -122,11 +140,14 @@ public class DexDex {
 
                 // restore original events to be dispatched
                 FrameworkHack.setMessages(mq, orgMessages);
+                Log.d(TAG, "messages restored");
+                dumpMessages(orgMessages);
 
                 if(listener!=null) {
                     listener.prepareEnded(handler);
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 throw new RuntimeException(e);
             }
         } else {
@@ -136,15 +157,44 @@ public class DexDex {
 
     /** like Looper.loop() */
     private static void loopByHand(MessageQueue q) {
+        Log.d(TAG, "loopByHand : "+q);
         while(true) {
             Message msg = FrameworkHack.messageQueueNext(q);
-            Log.d("DexDex", "loopByHand "+msg);
+            dumpMessage(msg);
             if(msg.what==WHAT_FINISH) {
+                Log.d(TAG, "!!!!!!!!!!!!!!!!!!!!!!!! After finish !!!!!!!!!!!!!!!!!!!!!!!!!!");
+                dumpMessages(msg);
                 return;
             }
             if(msg==null) return;   // quit() called
             msg.getTarget().dispatchMessage(msg);
             msg.recycle();
+        }
+    }
+
+    private static void dumpMessage(Message msg) {
+        long curr = SystemClock.uptimeMillis();
+        long diff = curr - msg.getWhen();
+        long timestamp = System.currentTimeMillis() + diff;
+        String when = new Date(timestamp).toString();
+        String target = msg.getTarget().toString();
+        String strObj = msg.obj==null ? "null" : msg.obj.toString();
+        String msgStr = String.format("target:%s|obj:%s|what:%d|arg1:%d|arg2:%d|%s", target, strObj, msg.what, msg.arg1, msg.arg2, when);
+        Log.d(TAG, msgStr);
+    }
+
+    private static void dumpMessages(Message msg) {
+        try {
+            Field fieldNext = Message.class.getDeclaredField("next");
+            fieldNext.setAccessible(true);
+            Log.d(TAG, "dumpMessages0-0-0-0-0 begins-----------");
+            while(msg!=null) {
+                dumpMessage(msg);
+                msg = (Message) fieldNext.get(msg);
+            }
+            Log.d(TAG, "dumpMessages0-0-0-0-0 ends-----------");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
