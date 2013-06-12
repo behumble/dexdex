@@ -126,7 +126,6 @@ public class DexDex {
 
                 // restore original events to be dispatched
                 FrameworkHack.appendMessages(mq, orgMessages);
-                Log.d(TAG, "original messages appended");
 
                 if(listener!=null) {
                     listener.prepareEnded(handler);
