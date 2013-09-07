@@ -9,10 +9,6 @@ with dexdex you don't need
  - to introduce additional interface
  - to copy additional JARs in assets folder to internal storage
 
-ANR proof
----------
-with (dirty) event pumping, long running tasks(copying JARs to internals and dexopting) are be done in thread while UI events are not blocked.
-
 How to use
 ----------
 
