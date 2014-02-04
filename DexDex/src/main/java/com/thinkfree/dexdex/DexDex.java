@@ -254,7 +254,9 @@ public class DexDex {
                 FrameworkHack.appendDexListImplICS(jarFiles, pcl, dexDir, kitkatPlus);
             }
             // update theAppended if succeeded to prevent duplicated classpath entry
-            theAppended.addAll(jarPaths);
+            for (String jarName : names) {
+                theAppended.add(jarName);
+            }
             if(debug) {
                 Log.d(TAG, "appendOdexesToClassPath completed : " + pcl);
                 Log.d(TAG, "theAppended : " + theAppended);
@@ -286,6 +288,7 @@ public class DexDex {
                 ioe.printStackTrace();
             }
         }
+        destDir.setLastModified(System.currentTimeMillis());
     }
 
     private static ArrayList<File> strings2Files(String[] paths) {
