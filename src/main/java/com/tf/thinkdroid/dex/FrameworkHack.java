@@ -16,8 +16,7 @@
 
 package com.tf.thinkdroid.dex;
 
-import android.os.Message;
-import android.os.MessageQueue;
+import android.util.Log;
 import dalvik.system.DexFile;
 import dalvik.system.PathClassLoader;
 
@@ -26,6 +25,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.zip.ZipFile;
 
 /**
@@ -34,69 +34,10 @@ import java.util.zip.ZipFile;
  */
 public class FrameworkHack {
     private static final String TAG = "FrameworkHack";
-    private static Method METHOD_MESSAGE_QUEUE_NEXT;
-    private static Field FIELD_MESSAGE_QUEUE_MESSAGES;
-
-    static {
-        try {
-            METHOD_MESSAGE_QUEUE_NEXT = MessageQueue.class.getDeclaredMethod("next");
-            METHOD_MESSAGE_QUEUE_NEXT.setAccessible(true);
-            FIELD_MESSAGE_QUEUE_MESSAGES = MessageQueue.class.getDeclaredField("mMessages");
-            FIELD_MESSAGE_QUEUE_MESSAGES.setAccessible(true);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
+    public static boolean debug = false;
 
     private FrameworkHack() {
         // do not create an instance
-    }
-
-    public static Message messageQueueNext(MessageQueue q) {
-        try {
-            Object oMsg = METHOD_MESSAGE_QUEUE_NEXT.invoke(q);
-            return (Message) oMsg;
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public static Message getMessages(MessageQueue q) {
-        try {
-            return (Message) FIELD_MESSAGE_QUEUE_MESSAGES.get(q);
-        } catch (IllegalAccessException ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public static void appendMessages(MessageQueue q, Message msgsToAdd) {
-        Field fieldNext = null;
-        try {
-            fieldNext = Message.class.getDeclaredField("next");
-            fieldNext.setAccessible(true);
-            Message head = getMessages(q);
-            if(head==null) {
-                setMessages(q, msgsToAdd);
-            } else {
-                Message msg = head;
-                Message tail = msg;
-                while(msg!=null) {
-                    tail = msg;
-                    msg = (Message) fieldNext.get(msg);
-                }
-                fieldNext.set(tail, msgsToAdd);
-            }
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public static void setMessages(MessageQueue q, Message messages) {
-        try {
-            FIELD_MESSAGE_QUEUE_MESSAGES.set(q, messages);
-        } catch (IllegalAccessException ex) {
-            throw new RuntimeException(ex);
-        }
     }
 
     /**
@@ -114,7 +55,9 @@ public class FrameworkHack {
     }
 
     private static String joinPaths(String[] paths) {
-        if (paths == null) return "";
+        if (paths == null) {
+            return "";
+        }
         StringBuilder buf = new StringBuilder();
         for (int i = 0; i < paths.length; i++) {
             buf.append(paths[i]);
@@ -124,8 +67,9 @@ public class FrameworkHack {
     }
 
     // https://android.googlesource.com/platform/dalvik/+/android-1.6_r1/libcore/dalvik/src/main/java/dalvik/system/PathClassLoader.java
-    public static void appendDexListImplUnderICS(String[] jarPathsToAppend, PathClassLoader pcl, File optDir) throws Exception {
-        int oldSize = 1;    // gonna assume the original path had single entry for simplicity
+    public static void appendDexListImplUnderICS(String[] jarPathsToAppend, PathClassLoader pcl, File optDir)
+            throws Exception {
+        int oldSize = 1; // gonna assume the original path had single entry for simplicity
         Class pclClass = pcl.getClass();
         Field fPath = pclClass.getDeclaredField("path");
         fPath.setAccessible(true);
@@ -140,7 +84,7 @@ public class FrameworkHack {
         DexFile[] dexs = new DexFile[oldSize + jarPathsToAppend.length];
 
         Field fmPaths = pclClass.getDeclaredField("mPaths");
-        String[] newMPaths = new String[oldSize+jarPathsToAppend.length];
+        String[] newMPaths = new String[oldSize + jarPathsToAppend.length];
         // set originals
         newMPaths[0] = (String) forceGetFirst(pcl, fmPaths);
         forceSet(pcl, fmPaths, newMPaths);
@@ -152,14 +96,14 @@ public class FrameworkHack {
         dexs[0] = (DexFile) forceGetFirst(pcl, fmDexs);
 
         for (int i = 0; i < jarPathsToAppend.length; i++) {
-            newMPaths[oldSize+i] = jarPathsToAppend[i];
+            newMPaths[oldSize + i] = jarPathsToAppend[i];
             File pathFile = new File(jarPathsToAppend[i]);
-            files[oldSize+i] = pathFile;
-            zips[oldSize+i] = new ZipFile(pathFile);
+            files[oldSize + i] = pathFile;
+            zips[oldSize + i] = new ZipFile(pathFile);
             if (wantDex) {
-                String outDexName = pathFile.getName()+".dex";
+                String outDexName = pathFile.getName() + ".dex";
                 File outFile = new File(optDir, outDexName);
-                dexs[oldSize+i] = DexFile.loadDex(pathFile.getAbsolutePath(), outFile.getAbsolutePath(), 0);
+                dexs[oldSize + i] = DexFile.loadDex(pathFile.getAbsolutePath(), outFile.getAbsolutePath(), 0);
             }
         }
         forceSet(pcl, fmFiles, files);
@@ -169,7 +113,11 @@ public class FrameworkHack {
 
     // https://android.googlesource.com/platform/libcore/+/master/libdvm/src/main/java/dalvik/system/BaseDexClassLoader.java
     // https://android.googlesource.com/platform/libcore/+/master/dalvik/src/main/java/dalvik/system/BaseDexClassLoader.java
-    public static void appendDexListImplICS(ArrayList<File> jarFiles, PathClassLoader pcl, File optDir) throws Exception {
+    public static void appendDexListImplICS(ArrayList<File> jarFiles, PathClassLoader pcl, File optDir,
+                                            boolean kitkatPlus) throws Exception {
+        if(debug) {
+            Log.d(TAG, "appendDexListImplICS(" + jarFiles);
+        }
         // to save original values
         Class bdclClass = Class.forName("dalvik.system.BaseDexClassLoader");
         // ICS+ - pathList
@@ -182,19 +130,48 @@ public class FrameworkHack {
         fDexElements.setAccessible(true);
         Object objOrgDexElements = fDexElements.get(dplObj);
         int orgDexCount = Array.getLength(objOrgDexElements);
+        if(debug) {
+            Log.d(TAG, "orgDexCount : " + orgDexCount);
+            debugDexElements(objOrgDexElements);
+        }
         Class clazzElement = Class.forName("dalvik.system.DexPathList$Element");
         // create new merged array
         int jarCount = jarFiles.size();
         Object newDexElemArray = Array.newInstance(clazzElement, orgDexCount + jarCount);
         System.arraycopy(objOrgDexElements, 0, newDexElemArray, 0, orgDexCount);
-        Method mMakeDexElements = dplClass.getDeclaredMethod("makeDexElements", ArrayList.class, File.class);
+        Method mMakeDexElements = null;
+        if (kitkatPlus) {
+            mMakeDexElements =
+                    dplClass.getDeclaredMethod("makeDexElements", ArrayList.class, File.class, ArrayList.class);
+        } else {
+            mMakeDexElements = dplClass.getDeclaredMethod("makeDexElements", ArrayList.class, File.class);
+        }
         mMakeDexElements.setAccessible(true);
-        Object elemsToAdd = mMakeDexElements.invoke(null, jarFiles, optDir);
+        Object elemsToAdd;
+        if (kitkatPlus) {
+            elemsToAdd = mMakeDexElements.invoke(null, jarFiles, optDir, new ArrayList());
+        } else {
+            elemsToAdd = mMakeDexElements.invoke(null, jarFiles, optDir);
+        }
         for (int i = 0; i < jarCount; i++) {
             int pos = orgDexCount + i;
             Object elemToAdd = Array.get(elemsToAdd, i);
             Array.set(newDexElemArray, pos, elemToAdd);
         }
+        if(debug) {
+            Log.d(TAG, "appendDexListImplICS() " + Arrays.deepToString((Object[]) newDexElemArray));
+        }
         forceSet(dplObj, fDexElements, newDexElemArray);
+    }
+
+    private static void debugDexElements(Object dexElements) throws Exception {
+        Object[] objArray = (Object[]) dexElements;
+        Class clazzElement = Class.forName("dalvik.system.DexPathList$Element");
+        Field fFile = clazzElement.getDeclaredField("file");
+        fFile.setAccessible(true);
+        for (int i = 0; i < objArray.length; i++) {
+            File f = (File) fFile.get(objArray[i]);
+            Log.d(TAG, "[" + i + "] " + f);
+        }
     }
 }
