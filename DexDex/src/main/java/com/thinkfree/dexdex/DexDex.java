@@ -34,6 +34,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Observable;
+import java.util.Observer;
 
 import dalvik.system.PathClassLoader;
 
@@ -55,6 +57,7 @@ public class DexDex {
     private static final int SDK_INT_KITKAT = 19;
 
     private static final int BUF_SIZE = 8 * 1024;
+    public static final int PROGRESS_COMPLETE = 100;
 
     private static ArrayList<String> theAppended = new ArrayList<String>();
 
@@ -64,7 +67,11 @@ public class DexDex {
 
     private static Activity uiBlockedActivity = null;
 
-    private static ProgressDialog progressDialog = null;
+    /**
+     * just reuse existing interface for convenience
+     * @hide
+     */
+    public static Observer dexOptProgressObserver = null;
 
     private DexDex() {
         // do not create an instance
@@ -124,9 +131,9 @@ public class DexDex {
                         // finished
                         dexOptRequired = false;
 
-                        if (progressDialog != null) {
-                            progressDialog.dismiss();
-                            progressDialog = null;
+                        if(dexOptProgressObserver!=null) {
+                            dexOptProgressObserver.update(null, PROGRESS_COMPLETE);
+                            dexOptProgressObserver = null;
                         }
 
                         if (uiBlockedActivity != null) {
@@ -305,6 +312,15 @@ public class DexDex {
             Log.d(TAG, "showUiBlocker() for " + startActivity);
         }
         uiBlockedActivity = startActivity;
-        progressDialog = ProgressDialog.show(startActivity, title, msg, true);
+        final ProgressDialog progressDialog = ProgressDialog.show(startActivity, title, msg, true);
+        dexOptProgressObserver = new Observer() {
+            @Override
+            public void update(Observable observable, Object o) {
+                if(o==Integer.valueOf(PROGRESS_COMPLETE)) {
+                    progressDialog.dismiss();
+                }
+            }
+        };
+
     }
 }
