@@ -312,7 +312,10 @@ public class DexDex {
             Log.d(TAG, "showUiBlocker() for " + startActivity);
         }
         uiBlockedActivity = startActivity;
-        final ProgressDialog progressDialog = ProgressDialog.show(startActivity, title, msg, true);
+        final ProgressDialog progressDialog = new ProgressDialog(startActivity);
+        progressDialog.setMessage(msg);
+        progressDialog.setTitle(title);
+        progressDialog.setIndeterminate(true);
         dexOptProgressObserver = new Observer() {
             @Override
             public void update(Observable observable, Object o) {
@@ -321,6 +324,7 @@ public class DexDex {
                 }
             }
         };
-
+        
+        progressDialog.show();
     }
 }
