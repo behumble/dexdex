@@ -1,6 +1,7 @@
 DexDex
 ======
-a simple library to overcome 64K methods limit of DEX file
+- a ClassPath appender for dalvik Apps
+- can be used to overcome 64K methods limit of DEX file
 
 Documentation
 -------------
