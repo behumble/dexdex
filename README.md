@@ -1,3 +1,8 @@
+DEPRECATED
+==========
+Google released support classes to use Multi-dex application
+- [MultiDexApplication](http://developer.android.com/reference/android/support/multidex/MultiDexApplication.html) ,[MultiDex](http://developer.android.com/reference/android/support/multidex/MultiDex.html)
+
 DexDex
 ======
 - a ClassPath appender for dalvik Apps
