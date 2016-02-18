@@ -143,7 +143,7 @@ public class FrameworkHack {
         Method mMakeDexElements = null;
         if (marshmallowPlus) {
             mMakeDexElements =
-                    dplClass.getDeclaredMethod("makeDexElements", List.class, File.class, List.class);
+                    dplClass.getDeclaredMethod("makePathElements", List.class, File.class, List.class);
         } else if (kitkatPlus) {
             mMakeDexElements =
                     dplClass.getDeclaredMethod("makeDexElements", ArrayList.class, File.class, ArrayList.class);
